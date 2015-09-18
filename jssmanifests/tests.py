@@ -107,6 +107,11 @@ class JSSComputerAttributeMappingFormTest(TestCase):
     def setUp(self):
         self.client = Client()
 
+    def test_can_login_as_admin(self):
+        rc = self.client.login(username='superted', password='superted')
+        self.assertEqual(rc, True)
+        rc = self.client.logout()
+
     def test_can_login_as_staffuser(self):
         rc = self.client.login(username='bananaman', password='bananaman')
         self.assertEqual(rc, True)
@@ -261,6 +266,40 @@ class JSSComputerManifestTests(TestCase):
         mapping_match.apply_mapping(test_manifest)
 
         self.assertEqual(test_manifest, assert_test )
+
+
+@override_settings(MUNKI_REPO_DIR=cwd + '/' + test_repo_dir )
+class JSSComputerMappingFormDynamicContentTests(TestCase):
+
+    fixtures = [ 'mapping_types', 'test_user', 'test_mappings',  ]
+
+    def setUp(self):
+        self.client = Client()
+        self.client.login(username='superted', password='superted')
+
+        # Add a mapping with a non-existant manifest
+        
+        types = JSSComputerAttributeType.objects.filter(label__exact='Extension Attribute')
+
+        obj = JSSComputerAttributeMapping.objects.create(
+            jss_computer_attribute_type = types[0],
+            jss_computer_attribute_key = 'Test extension attribute',
+            jss_computer_attribute_value = 'Test value',
+            manifest_element_type = 'm', 
+            manifest_name = 'this manifest does not exist',
+            remove_from_xml = 0)
+
+        self.mapping_id = obj.id
+
+    def test_mapping_exists(self):
+
+        url = '/admin/jssmanifests/jsscomputerattributemapping/%s/'
+        response = self.client.get(url % self.mapping_id )
+
+        self.assertEqual(200, response.status_code)
+        
+        self.assertContains(response, "site_default</option>")
+        self.assertContains(response, "this manifest does not exist</option>")
 
 
 

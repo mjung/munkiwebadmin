@@ -28,8 +28,15 @@ def make_selectlist(item_list, nullvalue='--------'):
     return_list =  map(lambda x: (x,x), sorted( item_list ) )
     return [ (None, nullvalue) ] + return_list
 
-def get_manifest_selectlist( ):
-    return make_selectlist(get_manifestlist(), '(no manifest selected)' )
+def get_manifest_selectlist( selected_manifest ):
+ 
+    errors = []
+    list = get_manifestlist()
+    if list.count(selected_manifest) <= 0:
+        errors.append('Could not find manifest name %s in list of valid manifests' % selected_manifest)
+        list.insert(0, selected_manifest)
+
+    return (make_selectlist(list, '(no manifest selected)' ), errors)
 
 def get_catalog_selectlist( ):
     return make_selectlist(get_cataloglist(), '(no catalog selected)' )

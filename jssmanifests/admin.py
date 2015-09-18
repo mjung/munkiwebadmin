@@ -34,12 +34,20 @@ class JSSComputerAttributeMappingAdminForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super(JSSComputerAttributeMappingAdminForm, self).__init__(*args, **kwargs)
+        manifest_name=self.instance.manifest_name
+       # self.has_error(True)
+       # self.add_error('manifest_name', 'FOO')
+        choicelist, errors = utils.get_manifest_selectlist(manifest_name)
+
         self.fields['manifest_name'].widget = \
-            forms.widgets.Select( choices=utils.get_manifest_selectlist())
+            forms.widgets.Select( choices=choicelist )
         self.fields['catalog_name'].widget  = \
             forms.widgets.Select( choices=utils.get_catalog_selectlist())
         self.fields['package_name'].widget  = \
             forms.widgets.Select( choices=utils.get_packagename_selectlist())
+
+        self.is_valid()
+        self.errors
 
     def clean_package_name(self):
 

@@ -11,7 +11,8 @@
     fields:
         label: 'Site'
         computer_xpath: '//computer/general/site/name/text()'
-        api_path: '/api/url'
+        api_path: '/JSSResource/sites'
+        api_xpath: '/JSSResource/sites'
   - model: jssmanifests.JSSComputerAttributeType
     pk: 3
     fields:
