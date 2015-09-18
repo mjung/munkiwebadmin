@@ -20,6 +20,9 @@ urlpatterns = patterns('',
     url(r'^inventory/', include('inventory.urls')),
     url(r'^licenses/', include('licenses.urls')),
     url(r'^computer/', include('reports.urls')),
+
+    # For jss manifiests
+    url(r'^jssmanifests/', include('jssmanifests.urls')),
     
     # for compatibility with MunkiReport scripts    
     url(r'^$', include('reports.urls')),
