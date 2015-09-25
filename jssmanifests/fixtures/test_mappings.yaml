@@ -8,6 +8,7 @@
         catalog_name: ea_match_catalog
         jss_computer_attribute_type_id: 1
         remove_from_xml: 0
+        jsssite_id: 1
   - model: jssmanifests.JSSComputerAttributeMapping
     pk: 2
     fields:
@@ -16,6 +17,7 @@
         manifest_name: site_match_manifest
         jss_computer_attribute_type_id: 2
         remove_from_xml: 0
+        jsssite_id: 1
   - model: jssmanifests.JSSComputerAttributeMapping
     pk: 3
     fields:
@@ -25,6 +27,7 @@
         package_action: managed_installs
         jss_computer_attribute_type_id: 3
         remove_from_xml: 0
+        jsssite_id: 1
   - model: jssmanifests.JSSComputerAttributeMapping
     pk: 4
     fields:
@@ -34,6 +37,7 @@
         catalog_name: ea_match_catalog
         jss_computer_attribute_type_id: 1
         remove_from_xml: 0
+        jsssite_id: 1
   - model: jssmanifests.JSSComputerAttributeMapping
     pk: 5
     fields:
@@ -42,6 +46,7 @@
         manifest_name: site_match_manifest
         jss_computer_attribute_type_id: 2
         remove_from_xml: 0
+        jsssite_id: 1
   - model: jssmanifests.JSSComputerAttributeMapping
     pk: 6
     fields:
@@ -51,6 +56,7 @@
         package_action: managed_installs
         jss_computer_attribute_type_id: 3
         remove_from_xml: 0
+        jsssite_id: 1
   - model: jssmanifests.JSSComputerAttributeMapping
     pk: 7
     fields:
@@ -60,6 +66,7 @@
         package_action: optional_installs
         jss_computer_attribute_type_id: 4
         remove_from_xml: 0
+        jsssite_id: 1
   - model: jssmanifests.JSSComputerAttributeMapping
     pk: 8
     fields:
@@ -69,6 +76,7 @@
         package_action: optional_installs
         jss_computer_attribute_type_id: 4
         remove_from_xml: 0
+        jsssite_id: 1
   - model: jssmanifests.JSSComputerAttributeMapping
     pk: 9
     fields:
@@ -78,6 +86,7 @@
         package_action: managed_uninstalls
         jss_computer_attribute_type_id: 5
         remove_from_xml: 0
+        jsssite_id: 1
   - model: jssmanifests.JSSComputerAttributeMapping
     pk: 10
     fields:
@@ -87,3 +96,4 @@
         package_action: managed_uninstalls
         jss_computer_attribute_type_id: 5
         remove_from_xml: 0
+        jsssite_id: 1
