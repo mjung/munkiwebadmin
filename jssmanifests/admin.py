@@ -1,16 +1,150 @@
+from django.conf import settings
+
 from django.contrib import admin
 
 from django import forms
 
+import jss
+import re
+from django.http import HttpResponseRedirect
+
 from manifests.models import Manifest
 from catalogs.models import Catalog
 
+from django.conf.urls import patterns,url
+
+from guardian.admin import GuardedModelAdmin
+from guardian.shortcuts import assign_perm
+
 # Register your models here.
 
-from jssmanifests.models import JSSComputerAttributeType, JSSComputerAttributeMapping
+from jssmanifests.models import JSSComputerAttributeType, JSSComputerAttributeMapping,JSSSite,JSSUser,sync_sites
 
+from reports.models import BusinessUnit
 
 import jssmanifests.utils as utils
+
+from django.contrib.auth.models import User, Group
+
+try:
+    BUSINESS_UNITS_ENABLED = settings.BUSINESS_UNITS_ENABLED
+except AttributeError:
+    BUSINESS_UNITS_ENABLED = False
+
+try:
+    JSS_MAIN_SITE_NAME = settings.JSS_MAIN_SITE_NAME
+except AttributeError:
+    JSS_MAIN_SITE_NAME = 'Full Site Access'
+
+class JSSSiteAdminForm(forms.ModelForm):
+ 
+    def __init__(self, *args, **kwargs):
+        super(JSSSiteAdminForm, self).__init__(*args, **kwargs)
+
+class JSSSiteAdmin(GuardedModelAdmin): # (admin.ModelAdmin):
+   
+    form = JSSSiteAdminForm
+    actions = None
+
+    def has_add_permission(self, request):
+        return True
+
+    # This (the add of the sync from the jss is icky
+    def get_urls(self):
+        urls = super(JSSSiteAdmin, self).get_urls()
+        my_urls = [
+            url(r'^sync/$', self.sync_jss),
+        ]
+        return my_urls + urls
+
+    def sync_jss(self,request):
+#        jss_connection = jss.JSS(user=settings.JSS_READONLY_USER,
+#                                 password=settings.JSS_READONLY_PASS,
+#                                 url=settings.JSS_URL,
+#                                 ssl_verify=settings.JSS_VERIFY_CERT)
+#
+#        jss_sites = jss_connection.Site()
+#        jss_site_dict = {}
+#        for jss_site in jss_sites:
+#            jss_site_dict[ jss_site['id'] ] = jss_site
+#
+#            local_sites = JSSSite.objects.filter(jsssiteid__exact=jss_site['id'])
+#            if local_sites.count() > 1:
+#                # If there is more than one matching id, throw *all*
+#                # away, and start again
+#                local_sites.delete() ## XXX this needs testing
+#
+#            if local_sites.count() == 1:
+#                site = local_sites[0]
+#                if site.jsssitename != jss_site['name']:
+#                    site.jsssitename = jss_site['name']
+#                    site.save()
+#                  
+#                    site.businessunit.name = site.jsssitename
+#                    site.businessunit.save()
+#            else:
+#                group, created = Group.objects.get_or_create( jss_site['name'] )
+#
+#                if BUSINESS_UNITS_ENABLED:
+#                    bu, created   = BusinessUnit.objects.get_or_create( name = jss_site['name'] )
+#                    site = JSSSite(jsssiteid   = jss_site['id'],
+#                                   jsssitename = jss_site['name'],
+#                                   businessunit = bu,
+#                                   group = group )
+#                else: 
+#                    site = JSSSite(jsssiteid   = jss_site['id'],
+#                                   jsssitename = jss_site['name'],
+#                                   group = group )
+#                site.save()
+#                assign_perm('can_view_jsssite', group, site)
+#                bu.save()
+#
+#        seen_full_site = False
+#        for local_site in JSSSite.objects.all():
+#            
+#           # Try not to remove the full site, hey ?
+#           if local_site.jsssiteid < 0 and seen_full_site:
+#               raise ValueError('Can only have one full site (i.e. with a negative jsssiteid)')
+#           elif local_site.jsssiteid < 0:
+#               seen_full_site = True
+#               local_site.jsssitename      = JSS_MAIN_SITE_NAME
+#               if BUSINESS_UNITS_ENABLED:
+#                   local_site.businessunit.name = JSS_MAIN_SITE_NAME
+#                   local_site.businessunit.save()
+#               local_site.save()
+#               continue
+#
+#           local_site_id = '%d' % local_site.jsssiteid
+#
+#           if not jss_site_dict.has_key( local_site_id ): 
+#               # Should we also delete the business unit and group ?
+#               # (Not sure; currently not, as this seems safest, but it may 
+#               # not be what people want/expect; perhaps this should be an
+#               # option in the future)
+#               local_site.delete()
+#
+#        if not seen_full_site:
+#            group, created = Group.objects.get_or_create( JSS_MAIN_SITE_NAME )
+#            if BUSINESS_UNITS_ENABLED:
+#                bu, created = BusinessUnit.objects.get_or_create( name = JSS_MAIN_SITE_NAME )
+#                site  = JSSSite(jsssiteid = -1,
+#                                jsssitename = JSS_MAIN_SITE_NAME,
+#                                businessunit = bu, 
+#                                group = group )
+#            else:
+#                site  = JSSSite(jsssiteid = -1,
+#                                jsssitename = JSS_MAIN_SITE_NAME,
+#                                group = group )
+#
+#            site.save()
+#            assign_perm('can_view_jsssite', group, site)
+
+        sync_sites()
+
+        url = request.path
+        redir = re.sub('sync/', '', url);
+        return HttpResponseRedirect(redir) 
+
 
 class JSSComputerAttributeTypeAdmin(admin.ModelAdmin):
 
@@ -173,7 +307,7 @@ class JSSComputerAttributeMappingAdmin(admin.ModelAdmin):
                                           'manifest_element_type',
                                           'remove_from_xml',
                                           'priorty',
-                                          'site',
+                                          'jsssite',
                                           'enabled',
             ]}),
         ('Catalog Settings', {'fields': [ 'catalog_name', ] } ),
@@ -209,5 +343,15 @@ class JSSComputerAttributeMappingAdmin(admin.ModelAdmin):
     actions = [ 'bulk_enable_attribute_mappings',
                 'bulk_disable_attribute_mappings' ]
 
+class JSSUserAdmin(admin.ModelAdmin):
+
+    actions = None
+
+    def has_add_permission(self, request):
+        return True
+ 
+
+admin.site.register(JSSUser, JSSUserAdmin)
+admin.site.register(JSSSite, JSSSiteAdmin)
 admin.site.register(JSSComputerAttributeType, JSSComputerAttributeTypeAdmin)
 admin.site.register(JSSComputerAttributeMapping, JSSComputerAttributeMappingAdmin)

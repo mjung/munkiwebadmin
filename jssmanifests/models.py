@@ -1,8 +1,166 @@
 from django.db import models
+from django.conf import settings
+
+from django.contrib.auth.models import User, Group
+from reports.models import BusinessUnit
 
 from manifests.models import Manifest
 
+from datetime import datetime, timedelta
+
+from jssmanifests.jsshelper import fetch_account_sites
+from guardian.shortcuts import assign_perm
+
+import jss
+from string import atoi
+
 # Create your models here.
+
+try:
+    BUSINESS_UNITS_ENABLED = settings.BUSINESS_UNITS_ENABLED
+except:
+    BUSINESS_UNITS_ENABLED = False
+
+try:
+    JSS_MAIN_SITE_NAME = settings.JSS_MAIN_SITE_NAME
+except AttributeError:
+    JSS_MAIN_SITE_NAME = 'Full Site Access'
+
+
+## Helper functions
+# This should live in jsshelpers, but this brings with it a cicular dependancy
+# So ...
+
+def sync_sites():
+
+    # Sync time
+    # This is a little icky
+    sync_obj = JSSSite.objects.earliest('last_refresh')
+    try:
+        site_cache = timedelta(seconds=settings.JSS_SITE_CACHE_TIME)
+    except AttributeError:
+        site_cache = timedelta(seconds=300)
+
+    # Check freshness
+    now   = datetime.now()
+    delta =  now - sync_obj.last_refresh
+    if delta < site_cache:
+        return
+
+
+
+    jss_connection = jss.JSS(user=settings.JSS_READONLY_USER,
+                             password=settings.JSS_READONLY_PASS,
+                             url=settings.JSS_URL,
+                             ssl_verify=settings.JSS_VERIFY_CERT)
+
+    jss_sites = jss_connection.Site()
+    jss_site_dict = {}
+    for jss_site in jss_sites:
+        jss_site_dict[ jss_site['id'] ] = jss_site
+
+        local_sites = JSSSite.objects.filter(jsssiteid__exact=jss_site['id'])
+        if local_sites.count() > 1:
+            # If there is more than one matching id, throw *all*
+            # away, and start again
+            local_sites.delete() ## XXX this needs testing
+
+        if local_sites.count() == 1:
+            site = local_sites[0]
+            if site.jsssitename != jss_site['name']:
+                site.jsssitename = jss_site['name']
+                site.save()
+                  
+                site.businessunit.name = site.jsssitename
+                site.businessunit.save()
+        else:
+            group, created = Group.objects.get_or_create( name = jss_site['name'] )
+
+            if BUSINESS_UNITS_ENABLED:
+                bu, created   = BusinessUnit.objects.get_or_create( name = jss_site['name'] )
+                site = JSSSite(jsssiteid   = jss_site['id'],
+                               jsssitename = jss_site['name'],
+                               businessunit = bu,
+                               group = group )
+            else: 
+                site = JSSSite(jsssiteid   = jss_site['id'],
+                               jsssitename = jss_site['name'],
+                               group = group )
+            site.save()
+            assign_perm('can_view_jsssite', group, site)
+
+    seen_full_site = False
+    for local_site in JSSSite.objects.all():
+            
+       # Try not to remove the full site, hey ?
+       if local_site.jsssiteid < 0 and seen_full_site:
+           raise ValueError('Can only have one full site (i.e. with a negative jsssiteid)')
+       elif local_site.jsssiteid < 0:
+           seen_full_site = True
+           local_site.jsssitename      = JSS_MAIN_SITE_NAME
+           if BUSINESS_UNITS_ENABLED:
+               local_site.businessunit.name = JSS_MAIN_SITE_NAME
+               local_site.businessunit.save()
+           local_site.save()
+           continue
+
+       local_site_id = '%d' % local_site.jsssiteid
+
+       if not jss_site_dict.has_key( local_site_id ): 
+           # Should we also delete the business unit and group ?
+           # (Not sure; currently not, as this seems safest, but it may 
+           # not be what people want/expect; perhaps this should be an
+           # option in the future)
+           local_site.delete()
+
+    if not seen_full_site:
+        group, created = Group.objects.get_or_create( name = JSS_MAIN_SITE_NAME )
+        if BUSINESS_UNITS_ENABLED:
+            bu, created = BusinessUnit.objects.get_or_create( name = JSS_MAIN_SITE_NAME )
+            site  = JSSSite(jsssiteid = -1,
+                            jsssitename = JSS_MAIN_SITE_NAME,
+                            businessunit = bu, 
+                            group = group )
+        else:
+            site  = JSSSite(jsssiteid = -1,
+                            jsssitename = JSS_MAIN_SITE_NAME,
+                            group = group )
+
+        site.save()
+        assign_perm('can_view_jsssite', group, site)
+
+    return
+
+
+class JSSSite(models.Model):
+    jsssiteid    = models.IntegerField('JSS Site ID')
+    jsssitename  = models.CharField('Type Label', max_length=1024)
+     # Um ... this might be currently pointless
+    last_refresh = models.DateTimeField(auto_now=True)
+    # /Um
+
+    # 
+    # Allow business units to be used, if enabled (and cope if not)
+    # 
+    businessunit = models.ForeignKey(BusinessUnit, null=True,
+                                     blank=True, default=None,
+                                     verbose_name = 'Business Unit' )
+
+    # We are using groups to model permissions, so make sure each
+    # site has a group
+    group        = models.OneToOneField(Group, verbose_name = 'Related Group')
+
+    class Meta:
+       permissions = (
+           ('can_view_jsssite', 'Can view JSS Site'),
+           ('can_edit_jsssite', 'Can edit JSS Site'),
+       )
+       verbose_name        = 'JSS Site'
+       verbose_name_plural = 'JSS Sites'
+
+    def __unicode__(self):
+        return self.jsssitename + '(JSS Site %d)' % self.jsssiteid
+
 
 class JSSComputerAttributeType(models.Model):
     label = models.CharField('Type Label', max_length=1024)
@@ -77,7 +235,8 @@ class JSSComputerAttributeMapping(models.Model):
     ]
 
     jss_computer_attribute_type = \
-         models.ForeignKey(JSSComputerAttributeType) 
+         models.ForeignKey(JSSComputerAttributeType,
+                           verbose_name = 'Computer Attribute Type')
 
     jss_computer_attribute_type.short_description = 'Computer Attribute Type'
 
@@ -106,7 +265,7 @@ class JSSComputerAttributeMapping(models.Model):
 
     priorty  = models.IntegerField('Priorty', default = 0)
 
-    site   = models.CharField('Site', max_length=1024, blank=True)
+    jsssite =  models.ForeignKey(JSSSite, verbose_name= 'JSS Site')
 
     # This is to let people temporarily enable and disable mappings
     enabled = models.BooleanField('Mapping enabled', default=True)
@@ -117,18 +276,22 @@ class JSSComputerAttributeMapping(models.Model):
 
     def __unicode__(self):
         if self.jss_computer_attribute_type.xpath_needs_key: 
-            return '%s: If %s matches %s then %s %s ' \
+            return '%s: If %s matches %s then %s %s  (applies to site %s)' \
                 % ( self.jss_computer_attribute_type.label, 
                     self.jss_computer_attribute_key,
                     self.jss_computer_attribute_value,
                     self.action(),
-                    self.mapping_description())
+                    self.mapping_description(),
+                    self.jsssite.jsssitename) 
 
-        return 'If %s matches %s then %s %s' \
+        return '%s: If %s matches %s then %s %s (applies to site %s)' \
                 % ( self.jss_computer_attribute_type.label, 
+                    self.jss_computer_attribute_type.label,
                     self.jss_computer_attribute_value,
                     self.action(),
-                    self.mapping_description())
+                    self.mapping_description(),
+                    self.jsssite.jsssitename )
+
 
     def action(self):
         if self.remove_from_xml:
@@ -151,16 +314,26 @@ class JSSComputerAttributeMapping(models.Model):
 
         return '%s: %s' % (type, element)     
 
-    def is_in_site(self,site):
-        if not self.site or self.site == site:
-            return True
-        return False
+    def is_in_site(self,site_id):
+
+        # Every mapping *should* have a site, but just to be sure:
+        try:
+            our_siteid = self.jsssite.jsssiteid
+        except AttributeError: 
+            return False # If no site set, we do not belong to it
+
+        if our_siteid < 0:
+            # i.e. the full JSS Site (which has id -1 in this app)
+            return True 
+
+        site_id = atoi(site_id) # Convert to int to be sure
+        return (site_id == our_siteid)
 
     def computer_match(self,computer):
        
        # Check that we are in the correct site
-       site = computer.findtext('general/site')
-       if not self.is_in_site(site):
+       site_id = computer.findtext('general/site/id')
+       if not self.is_in_site(site_id):
            return False 
        
        elements = self.jss_computer_attribute_type.get_data(computer,self.jss_computer_attribute_key);
@@ -220,3 +393,75 @@ class JSSComputerAttributeMapping(models.Model):
 
         self._update_list(manifest[self.package_action], self.package_name)
         return 
+
+
+#
+# A glue class for permissions modelling
+#
+class JSSUser(models.Model):
+
+    user = models.OneToOneField(User)
+
+    sites             = models.ManyToManyField(JSSSite,blank=True,
+                                               verbose_name='JSS Site(s)')
+    # We assume that user.name == JSS username, but looking up
+    # information from the JSS (at least in version 9.72) via userid
+    # gives a richer set of data
+    # Sigh; one gets different information from calling account with 
+    # name=%s and userid=%s
+    # the former seems not to contain the 'Group access' string (even
+    # when the user is setup for group access, but only 'Full Access'
+    # or 'Site Access'
+    # It also doesn't provide the group membership info
+    jssuserid         = models.IntegerField('JSS User ID')
+    last_site_refresh = models.DateTimeField(auto_now=True)
+
+    def __unicode__(self):
+        return self.user.username
+
+    def site_permissions(self):
+       try:
+           user_cache = timedelta(seconds=settings.JSS_USER_CACHE_TIME)
+       except AttributeError:
+           user_cache = timedelta(seconds=300)
+
+       # Check freshness
+       now   = datetime.now()
+       delta =  now - self.last_site_refresh
+       if delta < user_cache:
+           return  
+
+       # Step 0: Update sites with the JSS
+       sync_sites()
+       siteids = fetch_account_sites(self.user.username,self.jssuserid)
+       # Step 1: Revoke membership of all *JSS* related groups
+       # This could probably be more efficient (i.e look at
+       # what needs to change and only change that)
+       for group in self.user.groups.filter(jsssite__isnull=False):
+          group.user_set.remove(self.user)
+       for site in self.sites.all():
+          self.sites.remove(site)
+
+       # If the user has full site access, add them to all JSS Related groups
+       if siteids == []:
+           for group in Group.objects.filter(jsssite__isnull=False):
+               group.user_set.add(self.user)
+           for site in JSSSite.objects.all():
+               self.sites.add(site)
+
+       # If the user has some site access, add them to the right groups
+       if siteids is not None:
+           for sid in siteids:
+               jsssite = JSSSite.objects.filter(jsssiteid=sid)[0]
+               jsssite.group.user_set.add(self.user)
+               self.sites.add(jsssite)
+           # Add them to the full site too
+           jsssite = JSSSite.objects.filter(jsssiteid__lt=0)[0]
+           jsssite.group.user_set.add(self.user)
+           self.sites.add(jsssite)
+          
+     
+       # Update timestamp (as a marker 
+       self.save()
+
+

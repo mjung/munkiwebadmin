@@ -1,0 +1,6 @@
+---
+  - model: jssmanifests.JSSSite
+    pk: 1
+    fields:
+        jsssitename: Full Site
+        jsssid: -1

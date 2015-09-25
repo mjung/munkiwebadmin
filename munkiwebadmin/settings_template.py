@@ -57,6 +57,25 @@ ALLOWED_HOSTS = ['*']
 TOKEN_TIMEOUT_DAYS = 1
 
 ANONYMOUS_USER_ID = -1
+
+# JSS Manifest Specific setttings:
+JSS_URL = 'https://jss.my.organisation.domain.private:8443'
+JSS_READONLY_USER = 'readonly'
+JSS_READONLY_PASS = 'topSecret!'
+# Should default to true ...
+JSS_VERIFY_CERT = True
+JSS_CAN_USE_FOR_TESTS = False
+# using the key jss_extension_attributes
+JSSMANIFESTS_DEBUG_DUMPJSSEA = True
+JSSMANIFESTS_DOWNLOAD_AS_ATTACHMENT=False
+
+# Changing this after having run things may cause pain
+JSS_MAIN_SITE_NAME = 'Full Site Access'
+
+JSS_USER_CACHE_TIME=300
+JSS_SITE_CACHE_TIME=300
+
+
 # -------------------------
 
 USE_LDAP = False

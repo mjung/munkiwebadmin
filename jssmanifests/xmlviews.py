@@ -36,7 +36,6 @@ def manifest(request, manifest_name):
        
             if settings.JSSMANIFESTS_DEBUG_DUMPJSSEA:
                 _dump_computer_ea(manifest, computer.iter('extension_attribute') )
-
             attribute_types = JSSComputerAttributeType.objects.all()
 
             manifest['computer_matches'] = []
