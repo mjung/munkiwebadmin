@@ -8,11 +8,6 @@ from catalogs.models import Catalog
 from django.conf import settings
 from django.db import models
 
-USERNAME_KEY = settings.MANIFEST_USERNAME_KEY
-APPNAME = settings.APPNAME
-REPO_DIR = settings.MUNKI_REPO_DIR
-ALL_ITEMS = settings.ALL_ITEMS
-
 try:
     GIT = settings.GIT_PATH
 except:
@@ -79,15 +74,15 @@ class MunkiGit:
         else:
             action = 'did something with'
 
-        # determine the path relative to REPO_DIR for the file at aPath
-        manifests_path = os.path.join(REPO_DIR, 'manifests')
+        # determine the path relative to MUNKI_REPO_DIR for the file at aPath
+        manifests_path = os.path.join(settings.MUNKI_REPO_DIR, 'manifests')
         itempath = aPath
         if aPath.startswith(manifests_path):
             itempath = aPath[len(manifests_path):]
 
         # generate the log message
         log_msg = ('%s %s manifest \'%s\' via %s'
-                  % (author_name, action, itempath, APPNAME))
+                  % (author_name, action, itempath, settings.APPNAME))
         self.runGit(['commit', '-m', log_msg, '--author', author_info])
         if self.results['returncode'] != 0:
             print "Failed to commit changes to %s" % aPath
@@ -133,12 +128,12 @@ class Manifest(object):
     def __pathForManifestNamed(aManifestName):
         '''Returns the path to a manifest given the manifest's name'''
         return os.path.join(
-            REPO_DIR, 'manifests', aManifestName.replace(':', '/'))
+            settings.MUNKI_REPO_DIR, 'manifests', aManifestName.replace(':', '/'))
 
     @classmethod
     def list(cls):
         '''Returns a list of available manifests'''
-        manifests_path = os.path.join(REPO_DIR, 'manifests')
+        manifests_path = os.path.join(settings.MUNKI_REPO_DIR, 'manifests')
         manifests = []
         skipdirs = ['.svn', '.git', '.AppleDouble']
         for dirpath, dirnames, filenames in os.walk(manifests_path):
@@ -182,7 +177,7 @@ class Manifest(object):
         if '_user_name' in manifest:
             user_list = manifest['_user_name']
             if user_list:
-                manifest[USERNAME_KEY] = user_list[0]
+                manifest[settings.MANIFEST_USERNAME_KEY] = user_list[0]
             del manifest['_user_name']
         manifest_path = cls.__pathForManifestNamed(manifest_name)
         #try:
@@ -235,7 +230,7 @@ class Manifest(object):
         versioned_set = set()
         manifest = cls.read(manifest_name)
         if manifest:
-            if ALL_ITEMS:
+            if settings.ALL_ITEMS:
                 catalog_list = ['all']
             else:
                 catalog_list = manifest.get('catalogs', ['all'])
@@ -262,8 +257,8 @@ class Manifest(object):
     @classmethod
     def findUserForManifest(cls, manifest_name):
         '''returns a username for a given manifest name'''
-        if USERNAME_KEY:
-            return cls.read(manifest_name).get(USERNAME_KEY, '')
+        if settings.MANIFEST_USERNAME_KEY:
+            return cls.read(manifest_name).get(settings.MANIFEST_USERNAME_KEY, '')
 
 class Manifests(models.Model):
     class Meta:

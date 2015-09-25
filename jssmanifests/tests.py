@@ -117,6 +117,7 @@ class JSSComputerAttributeMappingFormTest(TestCase):
     fixtures = [ 'mapping_types', 'test_user', 'test_sites', 'test_mappings',  ]
 
     def setUp(self):
+        #super(JSSComputerAttributeMappingFormTest, self).setUpClass()
         self.client = Client()
 
     def test_can_login_as_admin(self):
@@ -145,12 +146,14 @@ class JSSComputerAttributeMappingFormTest(TestCase):
   
         sitedefault = open('jssmanifests/example-data/repo/manifests/site_default')
         sitedefault_content = sitedefault.read()
+
         rc = self.client.get('/jssmanifests/xml/site_default')
         self.assertEqual(rc.status_code, 200)
+
         # (XXX): comment this out as my test setup currenlty has packages in 
         #        it and the sitedefault does not
         #        How do we fix this nicely ?
-        # self.assertEqual(rc.content, sitedefault_content) # how do we introduce tests ?
+        self.assertEqual(rc.content, sitedefault_content) # how do we introduce tests ?
   
 # 
 @override_settings(MUNKI_REPO_DIR=cwd + '/' + test_repo_dir )
@@ -159,6 +162,7 @@ class JSSComputerManifestTests(TestCase):
     fixtures = [ 'mapping_types', 'test_sites', 'test_mappings', ]
 
     def setUp(self):
+        #super(JSSComputerManifestTests, self).setUpClass()
         self.client = Client()
 
         computer_xml_file = open('jssmanifests/example-data/00000000-0000-1000-8000-000C29CDACC7')
@@ -289,6 +293,7 @@ class JSSComputerMappingFormDynamicContentTests(TestCase):
     fixtures = [ 'mapping_types', 'test_user', 'test_sites', 'test_mappings',  ]
 
     def setUp(self):
+        #super(JSSComputerMappingFormDynamicContentTests, self).setUpClass()
         self.client = Client()
         self.client.login(username='superted', password='superted')
 
