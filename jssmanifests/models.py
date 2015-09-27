@@ -34,20 +34,19 @@ except AttributeError:
 def sync_sites():
 
     # Sync time
-    # This is a little icky
-    sync_obj = JSSSite.objects.earliest('last_refresh')
-    try:
-        site_cache = timedelta(seconds=settings.JSS_SITE_CACHE_TIME)
-    except AttributeError:
-        site_cache = timedelta(seconds=300)
+    # This is a little icky 
+    if JSSSite.objects.count() > 0:
+        sync_obj = JSSSite.objects.earliest('last_refresh')
+        try:
+            site_cache = timedelta(seconds=settings.JSS_SITE_CACHE_TIME)
+        except AttributeError:
+            site_cache = timedelta(seconds=300)
 
-    # Check freshness
-    now   = datetime.now()
-    delta =  now - sync_obj.last_refresh
-    if delta < site_cache:
-        return
-
-
+        # Check freshness
+        now   = datetime.now()
+        delta =  now - sync_obj.last_refresh
+        if delta < site_cache:
+            return
 
     jss_connection = jss.JSS(user=settings.JSS_READONLY_USER,
                              password=settings.JSS_READONLY_PASS,
@@ -74,7 +73,8 @@ def sync_sites():
                 site.businessunit.name = site.jsssitename
                 site.businessunit.save()
         else:
-            group, created = Group.objects.get_or_create( name = jss_site['name'] )
+            group, created = Group.objects.get_or_create( 
+                name = 'JSS Site Access: %s' % jss_site['name'] )
 
             if BUSINESS_UNITS_ENABLED:
                 bu, created   = BusinessUnit.objects.get_or_create( name = jss_site['name'] )
@@ -92,38 +92,42 @@ def sync_sites():
     seen_full_site = False
     for local_site in JSSSite.objects.all():
             
-       # Try not to remove the full site, hey ?
-       if local_site.jsssiteid < 0 and seen_full_site:
-           raise ValueError('Can only have one full site (i.e. with a negative jsssiteid)')
-       elif local_site.jsssiteid < 0:
-           seen_full_site = True
-           local_site.jsssitename      = JSS_MAIN_SITE_NAME
-           if BUSINESS_UNITS_ENABLED:
-               local_site.businessunit.name = JSS_MAIN_SITE_NAME
-               local_site.businessunit.save()
-           local_site.save()
-           continue
+        # Try not to remove the full site, hey ?
+        if local_site.jsssiteid < 0 and seen_full_site:
+            raise ValueError('Can only have one full site (i.e. with a negative jsssiteid)')
+        elif local_site.jsssiteid < 0:
+            seen_full_site = True
+            local_site.jsssitename = settings.JSS_MAIN_SITE_NAME
+            if BUSINESS_UNITS_ENABLED:
+                bu, created = BusinessUnit.objects.get_or_create( 
+                    name = JSS_MAIN_SITE_NAME )
+                local_site.businessunit = bu
+            local_site.save()
+            continue
 
-       local_site_id = '%d' % local_site.jsssiteid
+        local_site_id = '%d' % local_site.jsssiteid
 
-       if not jss_site_dict.has_key( local_site_id ): 
-           # Should we also delete the business unit and group ?
-           # (Not sure; currently not, as this seems safest, but it may 
-           # not be what people want/expect; perhaps this should be an
-           # option in the future)
-           local_site.delete()
+        if not jss_site_dict.has_key( local_site_id ): 
+            # Should we also delete the business unit and group ?
+            # (Not sure; currently not, as this seems safest, but it may 
+            # not be what people want/expect; perhaps this should be an
+            # option in the future)
+            local_site.delete()
 
     if not seen_full_site:
-        group, created = Group.objects.get_or_create( name = JSS_MAIN_SITE_NAME )
+        group, created = Group.objects.get_or_create(
+            name = 'JSS Site Access: %s' % settings.JSS_MAIN_SITE_NAME )
+
         if BUSINESS_UNITS_ENABLED:
-            bu, created = BusinessUnit.objects.get_or_create( name = JSS_MAIN_SITE_NAME )
+            bu, created = BusinessUnit.objects.get_or_create( 
+                name = settings.JSS_MAIN_SITE_NAME )
             site  = JSSSite(jsssiteid = -1,
-                            jsssitename = JSS_MAIN_SITE_NAME,
+                            jsssitename = settings.JSS_MAIN_SITE_NAME,
                             businessunit = bu, 
                             group = group )
         else:
             site  = JSSSite(jsssiteid = -1,
-                            jsssitename = JSS_MAIN_SITE_NAME,
+                            jsssitename = settings.JSS_MAIN_SITE_NAME,
                             group = group )
 
         site.save()
@@ -159,7 +163,7 @@ class JSSSite(models.Model):
        verbose_name_plural = 'JSS Sites'
 
     def __unicode__(self):
-        return self.jsssitename + '(JSS Site %d)' % self.jsssiteid
+        return '%s (JSS Site %d)' % (self.jsssitename, self.jsssiteid)
 
 
 class JSSComputerAttributeType(models.Model):
@@ -191,8 +195,8 @@ class JSSComputerAttributeType(models.Model):
         default=False)
 
     class Meta:
-       verbose_name        = 'Computer Attribute Type'
-       verbose_name_plural = 'Computer Attribute Types'
+       verbose_name        = 'JSS Computer Attribute Type'
+       verbose_name_plural = 'JSS Computer Attribute Types'
 
     def __unicode__(self):
         return self.label
@@ -218,7 +222,7 @@ class JSSComputerAttributeType(models.Model):
         rv = computer.xpath(self.computer_xpath, key=key)
         return rv
 
-
+      
 class JSSComputerAttributeMapping(models.Model):
 
     MANIFEST_ELEMENTS = [
@@ -271,8 +275,13 @@ class JSSComputerAttributeMapping(models.Model):
     enabled = models.BooleanField('Mapping enabled', default=True)
 
     class Meta:
-       verbose_name        = 'Computer Attribute Mapping'
-       verbose_name_plural = 'Computer Attribute Mappings'
+       verbose_name        = 'JSS Computer Attribute Mapping'
+       verbose_name_plural = 'JSS Computer Attribute Mappings'
+       permissions = (
+           ('can_view_jsscomputerattributemapping', 'Can view JSS Computer Attribute Mappings'),
+       )
+
+        
 
     def __unicode__(self):
         if self.jss_computer_attribute_type.xpath_needs_key: 
@@ -418,6 +427,10 @@ class JSSUser(models.Model):
 
     def __unicode__(self):
         return self.user.username
+
+    class Meta:
+       verbose_name        = 'JSS User'
+       verbose_name_plural = 'JSS Users'
 
     def site_permissions(self):
        try:

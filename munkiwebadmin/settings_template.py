@@ -70,8 +70,9 @@ JSSMANIFESTS_DEBUG_DUMPJSSEA = True
 JSSMANIFESTS_DOWNLOAD_AS_ATTACHMENT=False
 
 # Changing this after having run things may cause pain
-JSS_MAIN_SITE_NAME = 'Full Site Access'
+JSS_MAIN_SITE_NAME = 'Full Site'
 
+# Time to sync with the JSS
 JSS_USER_CACHE_TIME=300
 JSS_SITE_CACHE_TIME=300
 

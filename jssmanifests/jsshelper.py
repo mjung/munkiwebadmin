@@ -1,8 +1,5 @@
 from django.conf import settings
-
-
 import jss
-
 
 
 def fetch_account_sites(username, jssuserid):

@@ -1,10 +1,10 @@
 from functools import wraps
-
+from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
+import jss
 
 from .models import JSSUser
 
-from django.conf import settings
 
 def _get_jss_user_id(username):
 
@@ -15,8 +15,8 @@ def _get_jss_user_id(username):
 
     try:
        account = jss_connection.Account('name=%s' % username)
-       userid = accounts.findtext('id')
-    except JSSGetError,  e:
+       userid = account.findtext('id')
+    except jss.JSSGetError,  e:
        raise Exception('User %s not found (%s)' % (username, e))
 
     return userid
